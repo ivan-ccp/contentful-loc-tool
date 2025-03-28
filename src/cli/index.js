@@ -1,0 +1,82 @@
+#!/usr/bin/env node
+const { program } = require('commander');
+const inquirer = require('inquirer');
+const chalk = require('chalk');
+const contentfulConfig = require('../config/contentful');
+const { listContentTypes } = require('../models/contentTypes');
+
+program
+  .name('contentful-loc')
+  .description('Contentful localization tool')
+  .version('1.0.0');
+
+program
+  .command('config')
+  .description('Configure the tool')
+  .action(async () => {
+    const answers = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'accessToken',
+        message: 'Enter your Contentful Management API token:',
+        validate: input => input.length > 0 || 'Token is required'
+      }
+    ]);
+
+    contentfulConfig.setAccessToken(answers.accessToken);
+    console.log(chalk.green('Configuration saved successfully!'));
+  });
+
+program
+  .command('export')
+  .description('Export content for translation')
+  .option('-t, --type <type>', 'Content type to export')
+  .option('-i, --id <id>', 'Specific entry ID to export')
+  .action(async (options) => {
+    try {
+      // If no content type specified, show list
+      if (!options.type) {
+        const types = listContentTypes();
+        const answer = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'contentType',
+            message: 'Select content type to export:',
+            choices: types.map(t => ({ name: t.name, value: t.id }))
+          }
+        ]);
+        options.type = answer.contentType;
+      }
+
+      // Import and run the export command
+      const { exportCommand } = require('./commands/export');
+      await exportCommand(options);
+    } catch (error) {
+      console.error(chalk.red('Export failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('import')
+  .description('Import translations')
+  .requiredOption('-f, --file <file>', 'Translation JSON file')
+  .action(async (options) => {
+    try {
+      // Import and run the import command
+      const { importCommand } = require('./commands/import');
+      await importCommand(options);
+    } catch (error) {
+      console.error(chalk.red('Import failed:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Error on unknown commands
+program.on('command:*', () => {
+  console.error(chalk.red('Invalid command'));
+  console.log('Run --help for a list of available commands.');
+  process.exit(1);
+});
+
+program.parse(); 
