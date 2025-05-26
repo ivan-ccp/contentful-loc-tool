@@ -12,13 +12,13 @@
   "dependencies": {
     "contentful-management": "^8.0.0",
     "@contentful/rich-text-html-renderer": "^15.0.0",
-    "@contentful/rich-text-from-markdown": "^1.0.0",
+    "@contentful/rich-text-from-markdown": "^16.0.0",
     "commander": "^11.0.0",
     "inquirer": "^8.2.0",
     "conf": "^10.0.0",
     "ora": "^7.0.0",
     "chalk": "^4.1.0",
-    "json2csv": "^6.0.0",
+    "json2csv": "^5.0.6",
     "yargs": "^17.0.0"
   },
   "devDependencies": {
