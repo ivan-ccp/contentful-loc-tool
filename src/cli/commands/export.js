@@ -116,6 +116,7 @@ async function fetchEntryWithReferences(environment, entryId, contentType) {
 async function exportCommand(options) {
   // Dynamic import for ora (ES module)
   const { default: ora } = await import('ora');
+  const inquirer = require('inquirer');
   const spinner = ora('Initializing...').start();
 
   try {
@@ -127,50 +128,70 @@ async function exportCommand(options) {
     spinner.text = 'Connecting to Contentful...';
     const environment = await contentfulConfig.getEnvironment();
 
-    if (options.id) {
-      // Export single entry
-      spinner.text = `Fetching entry ${options.id}...`;
-      const data = await fetchEntryWithReferences(environment, options.id, contentType);
-      
-      // Generate filename using English title if available
-      let filename = `${contentType.id}-${options.id}`;
-      if (data.fields.title && data.fields.title.en) {
-        const englishTitle = data.fields.title.en
-          .toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-          .replace(/\s+/g, '-') // Replace spaces with hyphens
-          .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-          .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-        
-        if (englishTitle) {
-          filename = `${contentType.id}-${englishTitle}-${options.id}`;
-        }
+    let entryId = options.id;
+
+    // If no entry ID provided, show interactive selection
+    if (!entryId) {
+      spinner.text = `Fetching ${contentType.name} entries for selection...`;
+      const entries = await rateLimitedRequest(() => environment.getEntries({
+        content_type: contentType.id,
+        limit: 100 // Limit to 100 entries for reasonable performance
+      }));
+
+      if (entries.items.length === 0) {
+        spinner.fail(chalk.red(`No ${contentType.name} entries found`));
+        return;
       }
-      
-      // Save to file
-      const outputFile = path.join(process.cwd(), `${filename}.json`);
-      fs.writeFileSync(outputFile, JSON.stringify(data, null, 2));
-      
-      spinner.succeed(chalk.green(`Entry exported to ${outputFile}`));
-    } else {
-      // Export all entries of type
-      spinner.text = `Fetching all ${contentType.name} entries...`;
-      const entries = await environment.getEntries({
-        content_type: contentType.id
+
+      spinner.stop();
+
+      // Create choices with ID and English title
+      const choices = entries.items.map(entry => {
+        const englishTitle = entry.fields.title?.en || entry.fields.name?.en || 'No title';
+        return {
+          name: `${entry.sys.id} - ${englishTitle}`,
+          value: entry.sys.id
+        };
       });
 
-      const results = await Promise.all(
-        entries.items.map(entry => 
-          fetchEntryWithReferences(environment, entry.sys.id, contentType)
-        )
-      );
+      const answer = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'entryId',
+          message: `Select a ${contentType.name} entry to export:`,
+          choices: choices,
+          pageSize: 15
+        }
+      ]);
 
-      // Save to file
-      const outputFile = path.join(process.cwd(), `${contentType.id}-all.json`);
-      fs.writeFileSync(outputFile, JSON.stringify(results, null, 2));
-      
-      spinner.succeed(chalk.green(`${results.length} entries exported to ${outputFile}`));
+      entryId = answer.entryId;
+      spinner.start();
     }
+
+    // Export single entry
+    spinner.text = `Fetching entry ${entryId}...`;
+    const data = await fetchEntryWithReferences(environment, entryId, contentType);
+    
+    // Generate filename using English title if available
+    let filename = `${contentType.id}-${entryId}`;
+    if (data.fields.title && data.fields.title.en) {
+      const englishTitle = data.fields.title.en
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+        .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+      
+      if (englishTitle) {
+        filename = `${contentType.id}-${englishTitle}-${entryId}`;
+      }
+    }
+    
+    // Save to file
+    const outputFile = path.join(process.cwd(), `${filename}.json`);
+    fs.writeFileSync(outputFile, JSON.stringify(data, null, 2));
+    
+    spinner.succeed(chalk.green(`Entry exported to ${outputFile}`));
   } catch (error) {
     spinner.fail(chalk.red('Export failed'));
     throw error;
