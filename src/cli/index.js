@@ -20,11 +20,29 @@ program
         name: 'accessToken',
         message: 'Enter your Contentful Management API token:',
         validate: input => input.length > 0 || 'Token is required'
+      },
+      {
+        type: 'input',
+        name: 'spaceId',
+        message: 'Enter your Contentful Space ID:',
+        validate: input => input.length > 0 || 'Space ID is required'
+      },
+      {
+        type: 'input',
+        name: 'environmentId',
+        message: 'Enter your Contentful Environment ID (default: master):',
+        default: 'master'
       }
     ]);
 
     contentfulConfig.setAccessToken(answers.accessToken);
+    contentfulConfig.setSpaceId(answers.spaceId);
+    contentfulConfig.setEnvironmentId(answers.environmentId);
+    
     console.log(chalk.green('Configuration saved successfully!'));
+    console.log(chalk.blue('Current configuration:'));
+    console.log(chalk.blue(`- Space ID: ${answers.spaceId}`));
+    console.log(chalk.blue(`- Environment: ${answers.environmentId}`));
   });
 
 program

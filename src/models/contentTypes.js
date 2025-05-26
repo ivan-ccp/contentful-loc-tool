@@ -9,7 +9,7 @@ const contentTypes = {
         fields: ['text']
       },
       offerDetail: {
-        type: 'storeOfferDetail',
+        type: 'storeOfferDetails',
         fields: ['title', 'description', 'sections'],
         references: {
           sections: {

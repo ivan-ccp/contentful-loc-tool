@@ -1,4 +1,4 @@
-const { documentToMarkdownString } = require('@contentful/rich-text-html-renderer');
+const { documentToHtmlString } = require('@contentful/rich-text-html-renderer');
 const { richTextFromMarkdown } = require('@contentful/rich-text-from-markdown');
 
 class RichTextService {
@@ -10,10 +10,31 @@ class RichTextService {
     if (!richText) return null;
 
     // First convert to HTML
-    const html = documentToMarkdownString(richText);
+    const html = documentToHtmlString(richText);
+    
+    // Simple HTML to Markdown conversion
+    let markdown = html
+      .replace(/<h1[^>]*>(.*?)<\/h1>/g, '# $1')
+      .replace(/<h2[^>]*>(.*?)<\/h2>/g, '## $1')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/g, '### $1')
+      .replace(/<h4[^>]*>(.*?)<\/h4>/g, '#### $1')
+      .replace(/<h5[^>]*>(.*?)<\/h5>/g, '##### $1')
+      .replace(/<h6[^>]*>(.*?)<\/h6>/g, '###### $1')
+      .replace(/<p[^>]*>(.*?)<\/p>/g, '$1\n\n')
+      .replace(/<strong[^>]*>(.*?)<\/strong>/g, '**$1**')
+      .replace(/<b[^>]*>(.*?)<\/b>/g, '**$1**')
+      .replace(/<em[^>]*>(.*?)<\/em>/g, '*$1*')
+      .replace(/<i[^>]*>(.*?)<\/i>/g, '*$1*')
+      .replace(/<ul[^>]*>(.*?)<\/ul>/gs, '$1')
+      .replace(/<ol[^>]*>(.*?)<\/ol>/gs, '$1')
+      .replace(/<li[^>]*>(.*?)<\/li>/g, '- $1\n')
+      .replace(/<br\s*\/?>/g, '\n')
+      .replace(/<[^>]+>/g, '') // Remove any remaining HTML tags
+      .replace(/\n\s*\n\s*\n/g, '\n\n') // Clean up multiple newlines
+      .trim();
     
     // Replace embedded entries and assets with placeholders
-    const markdown = html
+    markdown = markdown
       .replace(/<entry:([^>]+)>/g, '[ENTRY:$1]')
       .replace(/<asset:([^>]+)>/g, '[ASSET:$1]');
     

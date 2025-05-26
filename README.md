@@ -10,6 +10,7 @@ A command-line tool for exporting Contentful entries for translation and importi
 - Preserve embedded entries and assets in Rich Text fields
 - Support for multiple content types
 - Interactive CLI interface
+- Development environment support
 
 ## Installation
 
@@ -19,11 +20,16 @@ npm install
 
 ## Configuration
 
-Before using the tool, you need to configure your Contentful access token:
+Before using the tool, you need to configure your Contentful settings:
 
 ```bash
 contentful-loc config
 ```
+
+This will prompt you for:
+- Contentful Management API token
+- Space ID
+- Environment ID (defaults to 'master')
 
 ### Obtaining a Contentful API Token
 
@@ -38,6 +44,13 @@ contentful-loc config
 6. Click "Generate token"
 7. Copy the generated token (it starts with "CFPAT-")
 8. Use this token when running the `contentful-loc config` command
+
+### Development Environment
+
+The tool supports working with different Contentful environments:
+- Use `master` for production content
+- Use separate environments (e.g., `dev`) for testing
+- Environment ID can be changed at any time using `contentful-loc config`
 
 **Important Security Notes**:
 - Each user should generate their own API token
