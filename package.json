@@ -10,21 +10,21 @@
     "format": "prettier --write src/**/*.js"
   },
   "dependencies": {
-    "contentful-management": "^8.0.0",
-    "@contentful/rich-text-html-renderer": "^15.0.0",
     "@contentful/rich-text-from-markdown": "^16.0.0",
-    "commander": "^11.0.0",
-    "inquirer": "^8.2.0",
-    "conf": "^10.0.0",
-    "ora": "^7.0.0",
+    "@contentful/rich-text-html-renderer": "^15.0.0",
     "chalk": "^4.1.0",
+    "commander": "^11.0.0",
+    "conf": "^10.0.0",
+    "contentful-management": "^11.52.2",
+    "inquirer": "^8.2.0",
     "json2csv": "^5.0.6",
+    "ora": "^7.0.0",
     "yargs": "^17.0.0"
   },
   "devDependencies": {
-    "jest": "^29.0.0",
     "eslint": "^8.0.0",
-    "prettier": "^3.0.0",
-    "nodemon": "^3.0.0"
+    "jest": "^29.0.0",
+    "nodemon": "^3.0.0",
+    "prettier": "^3.0.0"
   }
-} 
+}
