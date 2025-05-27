@@ -135,7 +135,8 @@ async function exportCommand(options) {
       spinner.text = `Fetching ${contentType.name} entries for selection...`;
       const entries = await rateLimitedRequest(() => environment.getEntries({
         content_type: contentType.id,
-        limit: 100 // Limit to 100 entries for reasonable performance
+        limit: 100, // Limit to 100 entries for reasonable performance
+        order: '-sys.updatedAt' // Sort by last updated date, newest first
       }));
 
       if (entries.items.length === 0) {
@@ -148,8 +149,9 @@ async function exportCommand(options) {
       // Create choices with ID and English title
       const choices = entries.items.map(entry => {
         const englishTitle = entry.fields.title?.en || entry.fields.name?.en || 'No title';
+        const updatedDate = new Date(entry.sys.updatedAt).toLocaleDateString();
         return {
-          name: `${entry.sys.id} - ${englishTitle}`,
+          name: `${entry.sys.id} - ${englishTitle} (updated: ${updatedDate})`,
           value: entry.sys.id
         };
       });
