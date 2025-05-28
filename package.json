@@ -29,23 +29,5 @@
   },
   "bin": {
     "contentful-loc": "./src/cli/index.js"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "testMatch": [
-      "<rootDir>/tests/**/*.test.js",
-      "<rootDir>/tests/**/*.spec.js"
-    ],
-    "collectCoverageFrom": [
-      "src/**/*.js",
-      "!src/**/*.test.js",
-      "!src/**/*.spec.js",
-      "!**/node_modules/**"
-    ],
-    "roots": ["<rootDir>/src", "<rootDir>/tests"],
-    "clearMocks": true,
-    "verbose": true,
-    "moduleFileExtensions": ["js", "json"],
-    "testTimeout": 10000
   }
 }
