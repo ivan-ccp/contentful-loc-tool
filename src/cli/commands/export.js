@@ -5,6 +5,9 @@ const contentfulConfig = require('../../config/contentful');
 const { getContentType } = require('../../models/contentTypes');
 const RichTextService = require('../../services/richText');
 
+// Supported languages
+const SUPPORTED_LANGUAGES = ['en', 'de', 'es', 'fr', 'ja', 'ko', 'ru', 'zh'];
+
 // Rate limiting utility
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 let lastRequestTime = 0;
@@ -39,9 +42,18 @@ async function fetchEntryWithReferences(environment, entryId, contentType) {
       if (fields[fieldName]) {
         if (fields[fieldName].nodeType === 'document') {
           // Handle Rich Text fields
-          result[fieldName] = await RichTextService.toMarkdown(fields[fieldName]);
+          const richTextResult = await RichTextService.toMarkdown(fields[fieldName]);
+          // Ensure all languages are present
+          result[fieldName] = {};
+          SUPPORTED_LANGUAGES.forEach(lang => {
+            result[fieldName][lang] = richTextResult[lang] || '';
+          });
         } else {
-          result[fieldName] = fields[fieldName];
+          // Handle regular localized fields
+          result[fieldName] = {};
+          SUPPORTED_LANGUAGES.forEach(lang => {
+            result[fieldName][lang] = fields[fieldName][lang] || '';
+          });
         }
       }
     }
@@ -52,6 +64,7 @@ async function fetchEntryWithReferences(environment, entryId, contentType) {
         if (fields[refField]) {
           const localizedField = fields[refField];
           const result_refs = {};
+          let hasAnyReferences = false;
           
           // Handle localized reference fields
           for (const [locale, refValue] of Object.entries(localizedField)) {
@@ -64,12 +77,10 @@ async function fetchEntryWithReferences(environment, entryId, contentType) {
                     ...await extractTextFields(refEntry.fields, refConfig)
                   };
                   result_refs[locale] = refResult;
-                } else {
-                  result_refs[locale] = null;
+                  hasAnyReferences = true;
                 }
               } catch (error) {
                 console.warn(`Failed to fetch reference ${refValue.sys.id}:`, error.message);
-                result_refs[locale] = null;
               }
             } else if (Array.isArray(refValue)) {
               // Handle array of references
@@ -90,13 +101,17 @@ async function fetchEntryWithReferences(environment, entryId, contentType) {
                   }
                 }
               }
-              result_refs[locale] = resolvedRefs;
-            } else {
-              result_refs[locale] = null;
+              if (resolvedRefs.length > 0) {
+                result_refs[locale] = resolvedRefs;
+                hasAnyReferences = true;
+              }
             }
           }
           
-          result[refField] = result_refs;
+          // Only include the field if it has any actual references
+          if (hasAnyReferences) {
+            result[refField] = result_refs;
+          }
         }
       }
     }
