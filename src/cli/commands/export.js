@@ -177,7 +177,8 @@ async function exportCommand(options) {
           name: 'entryId',
           message: `Select a ${contentType.name} entry to export:`,
           choices: choices,
-          pageSize: 15
+          pageSize: 15,
+          loop: false
         }
       ]);
 

@@ -60,7 +60,8 @@ program
             type: 'list',
             name: 'contentType',
             message: 'Select content type to export:',
-            choices: types.map(t => ({ name: t.name, value: t.id }))
+            choices: types.map(t => ({ name: t.name, value: t.id })),
+            loop: false
           }
         ]);
         options.type = answer.contentType;
