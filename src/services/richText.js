@@ -57,6 +57,38 @@ class RichTextService {
   static async fromMarkdown(markdown, originalRichText) {
     if (!markdown) return null;
 
+    // Handle localized rich text (object with language keys)
+    if (typeof markdown === 'object' && !markdown.nodeType) {
+      const result = {};
+      for (const [locale, value] of Object.entries(markdown)) {
+        result[locale] = await this.fromMarkdown(value, originalRichText?.[locale]);
+      }
+      return result;
+    }
+
+    // If markdown is a string and originalRichText is not a rich text object,
+    // treat it as a simple text value
+    if (typeof markdown === 'string' && (!originalRichText || !originalRichText.nodeType)) {
+      return {
+        nodeType: 'document',
+        data: {},
+        content: [
+          {
+            nodeType: 'paragraph',
+            data: {},
+            content: [
+              {
+                nodeType: 'text',
+                value: markdown,
+                marks: [],
+                data: {}
+              }
+            ]
+          }
+        ]
+      };
+    }
+
     // Extract embedded entries and assets from original rich text
     const embeddedEntries = this.extractEmbeddedEntries(originalRichText);
     const embeddedAssets = this.extractEmbeddedAssets(originalRichText);
@@ -100,7 +132,7 @@ class RichTextService {
    * Extracts embedded entries from Rich Text
    */
   static extractEmbeddedEntries(richText) {
-    if (!richText) return {};
+    if (!richText || !richText.content) return {};
     
     const entries = {};
     const traverse = (node) => {
@@ -119,7 +151,7 @@ class RichTextService {
    * Extracts embedded assets from Rich Text
    */
   static extractEmbeddedAssets(richText) {
-    if (!richText) return {};
+    if (!richText || !richText.content) return {};
     
     const assets = {};
     const traverse = (node) => {
