@@ -25,6 +25,25 @@ const contentTypes = {
         }
       }
     }
+  },
+  // resource type is kept for internal reference, but not exported in listContentTypes
+  resource: {
+    id: 'resource',
+    name: 'Resource',
+    fields: ['value'],
+    richTextFields: ['value']
+  },
+  resourceSet: {
+    id: 'resourceSet',
+    name: 'Resource Set',
+    fields: ['resources'],
+    references: {
+      resources: {
+        type: 'resource',
+        fields: ['value'],
+        richTextFields: ['value']
+      }
+    }
   }
   // Add more content types here as needed
 };
@@ -34,7 +53,10 @@ function getContentType(id) {
 }
 
 function listContentTypes() {
-  return Object.values(contentTypes).map(({ id, name }) => ({ id, name }));
+  // Only return types that should be user-selectable (exclude 'resource')
+  return Object.values(contentTypes)
+    .filter(({ id }) => id !== 'resource')
+    .map(({ id, name }) => ({ id, name }));
 }
 
 module.exports = {

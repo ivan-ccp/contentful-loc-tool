@@ -4,8 +4,13 @@ describe('Content Types Model', () => {
   describe('listContentTypes', () => {
     it('should return list of content types', () => {
       const types = listContentTypes();
-      expect(types).toHaveLength(1);
-      expect(types[0]).toEqual({ id: 'storeOffer', name: 'Store Offer' });
+      expect(types).toHaveLength(2);
+      expect(types).toEqual(
+        expect.arrayContaining([
+          { id: 'storeOffer', name: 'Store Offer' },
+          { id: 'resourceSet', name: 'Resource Set' }
+        ])
+      );
     });
   });
 

@@ -9,6 +9,15 @@ class RichTextService {
   static async toMarkdown(richText) {
     if (!richText) return null;
 
+    // Handle localized rich text (object with language keys)
+    if (typeof richText === 'object' && !richText.nodeType) {
+      const result = {};
+      for (const [locale, value] of Object.entries(richText)) {
+        result[locale] = await this.toMarkdown(value);
+      }
+      return result;
+    }
+
     // First convert to HTML
     const html = documentToHtmlString(richText);
     
