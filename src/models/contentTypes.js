@@ -25,6 +25,20 @@ const contentTypes = {
         }
       }
     }
+  },
+  resourceSet: {
+    id: 'resourceSet',
+    name: 'Resource Set',
+    fields: ['title', 'description'],
+    references: {
+      resources: {
+        type: 'resource',
+        fields: ['title', 'description', 'value'],
+        references: {
+          // Additional nested references can be added here if needed
+        }
+      }
+    }
   }
   // Add more content types here as needed
 };
