@@ -22,6 +22,20 @@ This will prompt you for:
 - **Space ID**
 - **Environment ID** (defaults to 'master')
 
+### Obtaining a Contentful API Token
+
+1. Log in to your Contentful account at https://app.contentful.com
+2. Go to **Settings > API keys**
+3. Click **"Generate personal token"**
+4. Give your token a name (e.g., "Localization Tool")
+5. Select the following permissions:
+   - Content management
+   - Content delivery
+   - Content preview
+6. Click **"Generate token"**
+7. Copy the generated token (starts with "CFPAT-")
+8. Use this token when running `contentful-loc config`
+
 ## Usage
 
 ### Export Content
