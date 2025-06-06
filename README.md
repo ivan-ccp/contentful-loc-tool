@@ -42,17 +42,21 @@ This will prompt you for:
 
 **Interactive Mode** (Recommended):
 ```bash
-contentful-loc export --type storeOffer
+contentful-loc export
 ```
-This will show a list of entries with their IDs, English titles, and last updated dates for easy selection.
+This will show a list of supported content types and entries with their IDs, English titles, and last updated dates for easy selection.
 
 **Direct Export**:
+```bash
+contentful-loc export --type storeOffer
+```
+or
 ```bash
 contentful-loc export --type storeOffer --id <entry-id>
 ```
 
 **Available Options**:
-- `-t, --type <type>` - Content type to export (required)
+- `-t, --type <type>` - Content type to export (optional)
 - `-i, --id <id>` - Specific entry ID (optional, triggers interactive mode if omitted)
 
 ### Export Features
