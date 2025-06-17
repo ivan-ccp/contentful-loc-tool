@@ -3,7 +3,7 @@ const Conf = require('conf');
 const config = new Conf({
   projectName: 'contentful-loc-tool',
   defaults: {
-    spaceId: '7lhcm73ukv5p',
+    spaceId: null,
     accessToken: null,
     lastUsedContentType: null
   }

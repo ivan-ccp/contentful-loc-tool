@@ -1,6 +1,6 @@
 # Contentful Localization Tool
 
-A command-line tool for exporting Contentful entries for translation and importing them back with full support for nested references and rate limiting.
+A command-line tool for exporting Contentful entries for translation and importing them back with support for nested references and rate limiting.
 
 ## Installation
 
@@ -83,7 +83,6 @@ Currently supported content types with full nested reference resolution:
   - **Store Offer Item** (`storeOfferItem`)
 - **Resource Set** (`resourceSet`)
   - **Resource** (`resource`)
-    - Supports exporting values from all child resource types
 
 Each content type supports:
 - Multi-language fields (en, de, es, fr, ja, ko, ru, zh)
