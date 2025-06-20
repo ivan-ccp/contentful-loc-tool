@@ -45,4 +45,6 @@ module.exports = {
   setEnvironmentId: (id) => config.set('environmentId', id),
   setLastUsedContentType: (type) => config.set('lastUsedContentType', type),
   getLastUsedContentType: () => config.get('lastUsedContentType'),
+  getAllConfig: () => config.store,
+  getConfig: (key) => config.get(key),
 }; 

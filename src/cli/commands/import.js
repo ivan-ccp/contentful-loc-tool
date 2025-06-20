@@ -4,6 +4,26 @@ const chalk = require('chalk');
 const contentfulConfig = require('../../config/contentful');
 const { getContentType } = require('../../models/contentTypes');
 const RichTextService = require('../../services/richText');
+const { fetchEntryWithReferences } = require('../../utils/contentfulHelpers');
+
+// Function to sanitize JSON content
+function sanitizeJsonContent(content) {
+  return content
+    // Replace unbreakable spaces (U+00A0) with regular spaces
+    .replace(/\u00A0/g, ' ')
+    // Replace other common problematic whitespace characters
+    .replace(/\u200B/g, '') // Zero-width space
+    .replace(/\u200C/g, '') // Zero-width non-joiner
+    .replace(/\u200D/g, '') // Zero-width joiner
+    .replace(/\u2060/g, '') // Word joiner
+    // Replace smart quotes with regular quotes
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    // Replace em dash and en dash with regular dash
+    .replace(/[\u2013\u2014]/g, '-')
+    // Trim whitespace
+    .trim();
+}
 
 async function importCommand(options) {
   // Dynamic import for ora (ES module)
@@ -17,7 +37,11 @@ async function importCommand(options) {
       throw new Error(`File not found: ${filePath}`);
     }
 
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    // Read file content and sanitize it
+    const rawContent = fs.readFileSync(filePath, 'utf8');
+    const sanitizedContent = sanitizeJsonContent(rawContent);
+    
+    const data = JSON.parse(sanitizedContent);
     const entries = Array.isArray(data) ? data : [data];
     
     spinner.text = 'Connecting to Contentful...';
@@ -32,106 +56,77 @@ async function importCommand(options) {
         throw new Error(`Unknown content type: ${translatedEntry.contentType}`);
       }
 
-      // Get the original entry to compare
-      const entry = await environment.getEntry(translatedEntry.id);
+      // Get the original entry with all nested references
+      const currentEntry = await fetchEntryWithReferences(environment, translatedEntry.id, contentType, {
+        includeAllLanguages: false,
+        useRateLimit: false
+      });
       
-      // Update fields based on content type definition
-      const updateFields = async (fields, translatedFields, typeConfig) => {
-        const updates = {};
+      // Merge translations with current fields
+      const mergeTranslations = (current, translated) => {
+        const merged = { ...current };
         
-        for (const fieldName of typeConfig.fields) {
-          const translatedValue = translatedFields[fieldName];
-          
-          // Skip if the field is empty in the translation file
-          if (!translatedValue) continue;
-          
-          // Check if this is a rich text field
-          const isRichText = fields[fieldName]?.nodeType === 'document' || 
-                           typeConfig.richTextFields?.includes(fieldName);
-          
-          if (isRichText) {
-            // Handle Rich Text fields - convert markdown to rich text
-            updates[fieldName] = await RichTextService.fromMarkdown(
-              translatedValue,
-              fields[fieldName]
-            );
-          } else {
-            // Handle regular fields - write as is
-            updates[fieldName] = translatedValue;
-          }
-        }
-
-        // Handle references if present
-        if (typeConfig.references) {
-          for (const [refField, refConfig] of Object.entries(typeConfig.references)) {
-            const translatedRefs = translatedFields[refField];
-            if (!translatedRefs) continue;
-
-            const updates_refs = {};
-            let hasAnyUpdates = false;
-
-            // Process each locale's references
-            for (const [locale, refValue] of Object.entries(translatedRefs)) {
-              if (!refValue) continue;
-
-              if (Array.isArray(refValue)) {
-                // Handle array of references
-                const resolvedRefs = [];
-                for (const ref of refValue) {
-                  if (!ref || !ref.id) continue;
+        // Handle each field in the translated data
+        for (const [fieldName, fieldValue] of Object.entries(translated)) {
+          if (fieldName === 'resources' && fieldValue && typeof fieldValue === 'object') {
+            // Handle resources field specifically
+            for (const [locale, resources] of Object.entries(fieldValue)) {
+              if (!resources || !Array.isArray(resources)) {
+                continue;
+              }
+              
+              // Initialize merged resources if it doesn't exist
+              if (!merged.resources) {
+                merged.resources = {};
+              }
+              if (!merged.resources[locale]) {
+                merged.resources[locale] = [];
+              }
+              
+              merged.resources[locale] = resources.map((translatedResource, index) => {
+                const currentResource = current.resources?.[locale]?.[index];
+                
+                if (!currentResource) {
+                  return translatedResource;
+                }
+                
+                // Merge the resource's value field
+                const mergedResource = { ...currentResource };
+                
+                if (translatedResource.value && currentResource.value) {
+                  // Start with current values and merge in new translations
+                  mergedResource.value = { ...currentResource.value };
                   
-                  // Get the referenced entry
-                  const refEntry = await environment.getEntry(ref.id);
-                  
-                  if (refEntry.sys.contentType.sys.id === refConfig.type) {
-                    // Recursively update the referenced entry's fields
-                    const refUpdates = await updateFields(refEntry.fields, ref, refConfig);
-                    if (Object.keys(refUpdates).length > 0) {
-                      Object.assign(refEntry.fields, refUpdates);
-                      await refEntry.update();
-                      resolvedRefs.push({ sys: { type: 'Link', linkType: 'Entry', id: ref.id } });
-                      hasAnyUpdates = true;
+                  // Only add non-empty translations from the file
+                  for (const [lang, text] of Object.entries(translatedResource.value)) {
+                    if (text && text.trim && text.trim() !== '' && text !== '') {
+                      mergedResource.value[lang] = text;
                     }
                   }
+                } else if (translatedResource.value) {
+                  // If current resource has no value but translated does, use translated
+                  mergedResource.value = translatedResource.value;
                 }
-                if (resolvedRefs.length > 0) {
-                  updates_refs[locale] = resolvedRefs;
-                }
-              } else if (refValue.id) {
-                // Handle single reference
-                const refEntry = await environment.getEntry(refValue.id);
-                if (refEntry.sys.contentType.sys.id === refConfig.type) {
-                  const refUpdates = await updateFields(refEntry.fields, refValue, refConfig);
-                  if (Object.keys(refUpdates).length > 0) {
-                    Object.assign(refEntry.fields, refUpdates);
-                    await refEntry.update();
-                    updates_refs[locale] = { sys: { type: 'Link', linkType: 'Entry', id: refValue.id } };
-                    hasAnyUpdates = true;
-                  }
-                }
-              }
+                
+                return mergedResource;
+              });
             }
-
-            if (hasAnyUpdates) {
-              updates[refField] = updates_refs;
-            }
+          } else {
+            // Handle other fields normally
+            merged[fieldName] = fieldValue;
           }
         }
-
-        return updates;
+        
+        return merged;
       };
-
-      // Update the entry's fields
-      const updates = await updateFields(entry.fields, translatedEntry.fields, contentType);
       
-      // Only update if there are changes
-      if (Object.keys(updates).length > 0) {
-        Object.assign(entry.fields, updates);
-        await entry.update();
-        spinner.succeed(chalk.green(`Updated entry ${entry.sys.id}`));
-      } else {
-        spinner.info(chalk.blue(`No changes for entry ${entry.sys.id}`));
-      }
+      // Merge the translations
+      const mergedFields = mergeTranslations(currentEntry.fields, translatedEntry.fields);
+      
+      // Now we need to update the actual Contentful entries
+      await updateContentfulEntries(environment, mergedFields, contentType);
+      
+      spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id}`));
     }
 
     spinner.succeed(chalk.green('Import completed successfully'));
@@ -139,6 +134,53 @@ async function importCommand(options) {
     spinner.fail(chalk.red('Import failed'));
     console.error('Error details:', error);
     throw error;
+  }
+}
+
+// Function to update Contentful entries with merged data
+async function updateContentfulEntries(environment, mergedFields, contentType) {
+  // Handle references
+  if (contentType.references) {
+    for (const [refField, refConfig] of Object.entries(contentType.references)) {
+      if (mergedFields[refField]) {
+        const localizedField = mergedFields[refField];
+        
+        // Handle localized reference fields
+        for (const [locale, refValue] of Object.entries(localizedField)) {
+          if (Array.isArray(refValue)) {
+            // Handle array of references
+            for (const ref of refValue) {
+              if (ref && ref.id) {
+                try {
+                  const refEntry = await environment.getEntry(ref.id);
+                  if (refEntry.sys.contentType.sys.id === refConfig.type) {
+                    // Update the referenced entry's fields
+                    for (const [fieldName, fieldValue] of Object.entries(ref)) {
+                      if (fieldName !== 'id' && fieldValue) {
+                        // Check if this is a Rich Text field
+                        const isRichText = refEntry.fields[fieldName]?.nodeType === 'document' || 
+                                         refConfig.richTextFields?.includes(fieldName);
+                        
+                        if (isRichText) {
+                          // Convert plain text to Rich Text format
+                          const richTextValue = await RichTextService.fromMarkdown(fieldValue, refEntry.fields[fieldName]);
+                          refEntry.fields[fieldName] = richTextValue;
+                        } else {
+                          refEntry.fields[fieldName] = fieldValue;
+                        }
+                      }
+                    }
+                    await refEntry.update();
+                  }
+                } catch (error) {
+                  console.warn(`Failed to update reference ${ref.id}:`, error.message);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 

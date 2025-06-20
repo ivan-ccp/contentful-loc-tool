@@ -46,6 +46,32 @@ program
   });
 
 program
+  .command('config:show')
+  .description('Show current configuration')
+  .action(() => {
+    const allConfig = contentfulConfig.getAllConfig();
+    
+    if (Object.keys(allConfig).length === 0) {
+      console.log(chalk.yellow('No configuration found. Run "contentful-loc config" to set up your configuration.'));
+      return;
+    }
+    
+    console.log(chalk.blue('Current configuration:'));
+    console.log(chalk.blue('==================='));
+    
+    Object.keys(allConfig).forEach(key => {
+      const value = allConfig[key];
+      if (key === 'accessToken' && value) {
+        // Mask the access token for security
+        const maskedToken = value.substring(0, 8) + '...' + value.substring(value.length - 4);
+        console.log(chalk.white(`${key}: ${maskedToken}`));
+      } else {
+        console.log(chalk.white(`${key}: ${value || '(not set)'}`));
+      }
+    });
+  });
+
+program
   .command('export')
   .description('Export content for translation')
   .option('-t, --type <type>', 'Content type to export')

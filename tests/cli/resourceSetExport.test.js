@@ -51,12 +51,15 @@ const SUPPORTED_LANGUAGES = ['en'];
 
 const { contentTypes } = require('../../src/models/contentTypes');
 
-// Import the export logic
-const { extractTextFields } = require('../../src/cli/commands/export');
+// Import the export logic from shared utilities
+const { extractTextFields } = require('../../src/utils/contentfulHelpers');
 
 describe('resourceSet export', () => {
   it('converts resource rich text to markdown and decodes apostrophes', async () => {
-    const result = await extractTextFields(mockResourceSetEntry.fields, contentTypes.resourceSet, mockEnvironment);
+    const result = await extractTextFields(mockResourceSetEntry.fields, contentTypes.resourceSet, mockEnvironment, {
+      includeAllLanguages: true,
+      decodeHtml: true
+    });
     const exportedValue = result.resources.en[0].value.en;
     expect(exportedValue).toBe("There's no PLEX in your vault.");
     // Ensure apostrophe is not encoded
