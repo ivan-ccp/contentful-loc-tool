@@ -25,7 +25,7 @@ This will prompt you for:
 To view your current config:
 
 ```bash
-contentful-loc config
+contentful-loc config:show
 ```
 
 ### Obtaining a Contentful API Token
