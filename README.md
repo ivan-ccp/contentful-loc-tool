@@ -85,6 +85,8 @@ Currently supported content types with full nested reference resolution:
   - **Store Offer Item** (`storeOfferItem`)
 - **Resource Set** (`resourceSet`)
   - **Resource** (`resource`)
+- **Text Block** (`textBlock`)
+  - Fields: `title` (Symbol), `text` (RichText)
 
 Each content type supports:
 - Multi-language fields (en, de, es, fr, ja, ko, ru, zh)
