@@ -1,5 +1,16 @@
+// Mock conf module before storage is required
+jest.mock('conf', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn(),
+    set: jest.fn(),
+    has: jest.fn(),
+    delete: jest.fn()
+  }));
+});
+
 const fs = require('fs');
 const path = require('path');
+
 const { exportCommand } = require('../../src/cli/commands/export');
 const contentfulConfig = require('../../src/config/contentful');
 const { fetchEntriesByTag, fetchEntryWithReferences } = require('../../src/utils/contentfulHelpers');
@@ -47,6 +58,31 @@ describe('Export Command', () => {
     };
 
     contentfulConfig.getEnvironment.mockResolvedValue(mockEnvironment);
+    
+    // Mock contentTypesModel.getContentType
+    contentTypesModel.getContentType.mockImplementation((id) => {
+      if (id === 'resourceSet') {
+        return { id: 'resourceSet', name: 'Resource Set', fields: ['resources'] };
+      }
+      if (id === 'resource') {
+        return { id: 'resource', name: 'Resource', fields: ['val'] };
+      }
+      return undefined;
+    });
+    
+    // Mock contentTypesModel.getAllSupportedContentTypeIds
+    contentTypesModel.getAllSupportedContentTypeIds.mockReturnValue(
+      new Set(['resource', 'resourceSet', 'textBlock'])
+    );
+    
+    // Mock contentTypesModel.getContentTypeIdToNameMap
+    contentTypesModel.getContentTypeIdToNameMap.mockReturnValue(
+      new Map([
+        ['resource', 'Resource'],
+        ['resourceSet', 'Resource Set'],
+        ['textBlock', 'Text Block']
+      ])
+    );
   });
 
   describe('Tag-based export', () => {

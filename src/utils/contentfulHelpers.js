@@ -151,9 +151,6 @@ async function fetchEntryWithReferences(environment, entryId, contentType, optio
 async function getTagIdByName(environment, tagNameOrId) {
   try {
     const tags = await rateLimitedRequest(() => environment.getTags());
-    console.log(`[DEBUG] Found ${tags.items.length} total tags`);
-    console.log(`[DEBUG] Tag names:`, tags.items.map(t => t.name));
-    console.log(`[DEBUG] Tag IDs:`, tags.items.map(t => t.sys.id));
     
     // First, try to find by ID (if it looks like an ID or if exact match)
     let tag = tags.items.find(t => t.sys.id === tagNameOrId);
@@ -168,11 +165,6 @@ async function getTagIdByName(environment, tagNameOrId) {
       });
     }
     
-    if (tag) {
-      console.log(`[DEBUG] Found tag "${tagNameOrId}" -> "${tag.name}" with ID: ${tag.sys.id}`);
-    } else {
-      console.log(`[DEBUG] Tag "${tagNameOrId}" not found in available tags`);
-    }
     return tag ? tag.sys.id : null;
   } catch (error) {
     console.warn(`Failed to fetch tag "${tagNameOrId}":`, error.message);
@@ -190,19 +182,14 @@ async function getTagIdByName(environment, tagNameOrId) {
 async function fetchEntriesByTag(environment, tagName, contentTypesModel) {
   const tagId = await getTagIdByName(environment, tagName);
   if (!tagId) {
-    console.log(`[DEBUG] No tag ID found for "${tagName}", returning empty array`);
     return [];
   }
 
   // Get all supported content type IDs including nested ones
   const supportedTypeIds = contentTypesModel.getAllSupportedContentTypeIds();
   const contentTypeIdToName = contentTypesModel.getContentTypeIdToNameMap();
-  
-  console.log(`[DEBUG] Supported content type IDs:`, Array.from(supportedTypeIds));
-  console.log(`[DEBUG] Content type ID to name map:`, Object.fromEntries(contentTypeIdToName));
 
   if (supportedTypeIds.size === 0) {
-    console.log(`[DEBUG] No supported content types found`);
     return [];
   }
 
@@ -214,7 +201,6 @@ async function fetchEntriesByTag(environment, tagName, contentTypesModel) {
   // Query all entries with the tag (pagination support)
   while (hasMore) {
     try {
-      console.log(`[DEBUG] Querying entries with tag ID "${tagId}", skip: ${skip}, limit: ${limit}`);
       const entries = await rateLimitedRequest(() => environment.getEntries({
         'metadata.tags.sys.id[in]': tagId,
         limit: limit,
@@ -222,12 +208,9 @@ async function fetchEntriesByTag(environment, tagName, contentTypesModel) {
         order: '-sys.updatedAt' // Sort by last updated date, newest first
       }));
 
-      console.log(`[DEBUG] Found ${entries.items.length} entries with tag (total: ${entries.total})`);
-
       // Filter to only supported content types and add metadata
       entries.items.forEach(entry => {
         const entryContentTypeId = entry.sys.contentType.sys.id;
-        console.log(`[DEBUG] Entry ${entry.sys.id} has content type: ${entryContentTypeId}, supported: ${supportedTypeIds.has(entryContentTypeId)}`);
         
         // Only include entries with supported content types
         if (supportedTypeIds.has(entryContentTypeId)) {
@@ -243,28 +226,22 @@ async function fetchEntriesByTag(environment, tagName, contentTypesModel) {
             };
           }
           
-          console.log(`[DEBUG] Adding entry ${entry.sys.id} with content type ${contentType.name}`);
           allEntries.push({
             entry,
             contentType: contentType
           });
-        } else {
-          console.log(`[DEBUG] Skipping entry ${entry.sys.id} - content type ${entryContentTypeId} not in supported list`);
         }
       });
 
       // Check if there are more entries to fetch
       skip += entries.items.length;
       hasMore = entries.items.length === limit && entries.total > skip;
-      console.log(`[DEBUG] Processed ${entries.items.length} entries, hasMore: ${hasMore}`);
     } catch (error) {
       console.warn(`Failed to fetch entries with tag "${tagName}":`, error.message);
-      console.error(`[DEBUG] Error details:`, error);
       hasMore = false;
     }
   }
 
-  console.log(`[DEBUG] Returning ${allEntries.length} entries after filtering`);
   return allEntries;
 }
 

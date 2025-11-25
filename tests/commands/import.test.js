@@ -1,5 +1,16 @@
+// Mock conf module before storage is required
+jest.mock('conf', () => {
+  return jest.fn().mockImplementation(() => ({
+    get: jest.fn(),
+    set: jest.fn(),
+    has: jest.fn(),
+    delete: jest.fn()
+  }));
+});
+
 const fs = require('fs');
 const path = require('path');
+
 const { importCommand } = require('../../src/cli/commands/import');
 const contentfulConfig = require('../../src/config/contentful');
 const { fetchEntryWithReferences, removeTagFromEntry } = require('../../src/utils/contentfulHelpers');
@@ -37,6 +48,14 @@ describe('Import Command', () => {
     };
 
     contentfulConfig.getEnvironment.mockResolvedValue(mockEnvironment);
+    
+    // Mock contentTypesModel.getContentType
+    contentTypesModel.getContentType.mockImplementation((id) => {
+      if (id === 'resource') {
+        return { id: 'resource', name: 'Resource', fields: ['val'] };
+      }
+      return undefined;
+    });
     
     // Mock fs.existsSync and readFileSync
     fs.existsSync.mockReturnValue(true);

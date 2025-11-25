@@ -42,6 +42,12 @@ const contentTypes = {
         fields: ['val']
       }
     }
+  },
+  textBlock: {
+    id: 'textBlock',
+    name: 'Text Block',
+    fields: ['title', 'text'],
+    richTextFields: ['text']
   }
   // Add more content types here as needed
 };

@@ -10,11 +10,12 @@ describe('Content Types Model', () => {
   describe('listContentTypes', () => {
     it('should return list of content types', () => {
       const types = listContentTypes();
-      expect(types).toHaveLength(2);
+      expect(types).toHaveLength(3);
       expect(types).toEqual(
         expect.arrayContaining([
           { id: 'storeOffer', name: 'Store Offer' },
-          { id: 'resourceSet', name: 'Resource Set' }
+          { id: 'resourceSet', name: 'Resource Set' },
+          { id: 'textBlock', name: 'Text Block' }
         ])
       );
     });
@@ -31,6 +32,11 @@ describe('Content Types Model', () => {
       expect(type).toEqual(contentTypes.resourceSet);
     });
 
+    it('should return textBlock content type by id', () => {
+      const type = getContentType('textBlock');
+      expect(type).toEqual(contentTypes.textBlock);
+    });
+
     it('should return undefined for non-existent content type', () => {
       const type = getContentType('nonExistent');
       expect(type).toBeUndefined();
@@ -45,6 +51,7 @@ describe('Content Types Model', () => {
       expect(typeIds.has('storeOffer')).toBe(true);
       expect(typeIds.has('resourceSet')).toBe(true);
       expect(typeIds.has('resource')).toBe(true);
+      expect(typeIds.has('textBlock')).toBe(true);
       
       // Should include nested types from storeOffer
       expect(typeIds.has('storeBadge')).toBe(true);
@@ -67,6 +74,7 @@ describe('Content Types Model', () => {
       expect(idToName.get('storeOffer')).toBe('Store Offer');
       expect(idToName.get('resourceSet')).toBe('Resource Set');
       expect(idToName.get('resource')).toBe('Resource');
+      expect(idToName.get('textBlock')).toBe('Text Block');
     });
 
     it('should include nested content types', () => {
