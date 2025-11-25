@@ -90,22 +90,22 @@ async function importCommand(options) {
                   return translatedResource;
                 }
                 
-                // Merge the resource's value field
+                // Merge the resource's val field
                 const mergedResource = { ...currentResource };
                 
-                if (translatedResource.value && currentResource.value) {
+                if (translatedResource.val && currentResource.val) {
                   // Start with current values and merge in new translations
-                  mergedResource.value = { ...currentResource.value };
+                  mergedResource.val = { ...currentResource.val };
                   
                   // Only add non-empty translations from the file
-                  for (const [lang, text] of Object.entries(translatedResource.value)) {
+                  for (const [lang, text] of Object.entries(translatedResource.val)) {
                     if (text && text.trim && text.trim() !== '' && text !== '') {
-                      mergedResource.value[lang] = text;
+                      mergedResource.val[lang] = text;
                     }
                   }
-                } else if (translatedResource.value) {
-                  // If current resource has no value but translated does, use translated
-                  mergedResource.value = translatedResource.value;
+                } else if (translatedResource.val) {
+                  // If current resource has no val but translated does, use translated
+                  mergedResource.val = translatedResource.val;
                 }
                 
                 return mergedResource;

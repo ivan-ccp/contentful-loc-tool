@@ -5,25 +5,8 @@ const he = require('he');
 const mockResourceEntry = {
   sys: { id: 'resource1', contentType: { sys: { id: 'resource' } } },
   fields: {
-    value: {
-      en: {
-        nodeType: 'document',
-        data: {},
-        content: [
-          {
-            nodeType: 'paragraph',
-            data: {},
-            content: [
-              {
-                nodeType: 'text',
-                value: "There's no PLEX in your vault.",
-                marks: [],
-                data: {}
-              }
-            ]
-          }
-        ]
-      }
+    val: {
+      en: "There's no PLEX in your vault."
     }
   }
 };
@@ -55,12 +38,12 @@ const { contentTypes } = require('../../src/models/contentTypes');
 const { extractTextFields } = require('../../src/utils/contentfulHelpers');
 
 describe('resourceSet export', () => {
-  it('converts resource rich text to markdown and decodes apostrophes', async () => {
+  it('exports resource markdown field and decodes apostrophes', async () => {
     const result = await extractTextFields(mockResourceSetEntry.fields, contentTypes.resourceSet, mockEnvironment, {
       includeAllLanguages: true,
       decodeHtml: true
     });
-    const exportedValue = result.resources.en[0].value.en;
+    const exportedValue = result.resources.en[0].val.en;
     expect(exportedValue).toBe("There's no PLEX in your vault.");
     // Ensure apostrophe is not encoded
     expect(exportedValue).not.toContain('&#39;');

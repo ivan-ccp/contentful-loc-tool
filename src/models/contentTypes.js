@@ -30,8 +30,7 @@ const contentTypes = {
   resource: {
     id: 'resource',
     name: 'Resource',
-    fields: ['value'],
-    richTextFields: ['value']
+    fields: ['val']
   },
   resourceSet: {
     id: 'resourceSet',
@@ -40,8 +39,7 @@ const contentTypes = {
     references: {
       resources: {
         type: 'resource',
-        fields: ['value'],
-        richTextFields: ['value']
+        fields: ['val']
       }
     }
   }
