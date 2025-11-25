@@ -85,7 +85,7 @@ async function importCommand(options) {
               
               merged.resources[locale] = resources.map((translatedResource, index) => {
                 const currentResource = current.resources?.[locale]?.[index];
-                
+                  
                 if (!currentResource) {
                   return translatedResource;
                 }
@@ -110,16 +110,16 @@ async function importCommand(options) {
                 
                 return mergedResource;
               });
-            }
+                }
           } else {
             // Handle other fields normally
             merged[fieldName] = fieldValue;
           }
         }
-        
+
         return merged;
       };
-      
+
       // Merge the translations
       const mergedFields = mergeTranslations(currentEntry.fields, translatedEntry.fields);
       
