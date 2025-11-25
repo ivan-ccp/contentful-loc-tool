@@ -78,19 +78,37 @@ program
   .option('-i, --id <id>', 'Specific entry ID to export')
   .action(async (options) => {
     try {
-      // If no content type specified, show list
+      // If no content type specified, ask for selection mode
       if (!options.type) {
-        const types = listContentTypes();
-        const answer = await inquirer.prompt([
+        const selectionModeAnswer = await inquirer.prompt([
           {
             type: 'list',
-            name: 'contentType',
-            message: 'Select content type to export:',
-            choices: types.map(t => ({ name: t.name, value: t.id })),
+            name: 'selectionMode',
+            message: 'How would you like to select entries?',
+            choices: [
+              { name: 'By Content Type', value: 'contentType' },
+              { name: 'By Tag (toLocalize)', value: 'tag' }
+            ],
             loop: false
           }
         ]);
-        options.type = answer.contentType;
+
+        if (selectionModeAnswer.selectionMode === 'tag') {
+          options.selectionMode = 'tag';
+        } else {
+          // Content type selection mode
+          const types = listContentTypes();
+          const answer = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'contentType',
+              message: 'Select content type to export:',
+              choices: types.map(t => ({ name: t.name, value: t.id })),
+              loop: false
+            }
+          ]);
+          options.type = answer.contentType;
+        }
       }
 
       // Import and run the export command

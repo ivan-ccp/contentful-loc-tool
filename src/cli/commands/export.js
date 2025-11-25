@@ -2,8 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 const contentfulConfig = require('../../config/contentful');
-const { getContentType } = require('../../models/contentTypes');
-const { fetchEntryWithReferences, rateLimitedRequest } = require('../../utils/contentfulHelpers');
+const contentTypesModel = require('../../models/contentTypes');
+const { getContentType } = contentTypesModel;
+const { fetchEntryWithReferences, rateLimitedRequest, fetchEntriesByTag } = require('../../utils/contentfulHelpers');
 
 async function exportCommand(options) {
   // Dynamic import for ora (ES module)
@@ -12,13 +13,56 @@ async function exportCommand(options) {
   const spinner = ora('Initializing...').start();
 
   try {
+    spinner.text = 'Connecting to Contentful...';
+    const environment = await contentfulConfig.getEnvironment();
+
+    // Handle tag-based selection
+    if (options.selectionMode === 'tag') {
+      const TAG_NAME = 'toLocalize';
+      
+      spinner.text = `Fetching entries with "${TAG_NAME}" tag...`;
+      const taggedEntries = await fetchEntriesByTag(environment, TAG_NAME, contentTypesModel);
+
+      if (taggedEntries.length === 0) {
+        spinner.fail(chalk.red(`No entries found with "${TAG_NAME}" tag`));
+        return;
+      }
+
+      spinner.text = `Exporting ${taggedEntries.length} entries...`;
+
+      // Export all tagged entries to a single array
+      const exportedEntries = [];
+      
+      for (let i = 0; i < taggedEntries.length; i++) {
+        const { entry, contentType } = taggedEntries[i];
+        const entryId = entry.sys.id;
+        spinner.text = `Fetching entry ${i + 1}/${taggedEntries.length}: ${entryId}...`;
+        
+        const data = await fetchEntryWithReferences(environment, entryId, contentType, {
+          includeAllLanguages: true,
+          decodeHtml: true,
+          useRateLimit: true
+        });
+        
+        exportedEntries.push(data);
+      }
+      
+      // Save all entries to a single file
+      spinner.text = 'Saving exported entries...';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const outputFile = path.join(process.cwd(), `exported-${TAG_NAME}-${timestamp}.json`);
+      fs.writeFileSync(outputFile, JSON.stringify(exportedEntries, null, 2));
+      
+      spinner.succeed(chalk.green(`Exported ${exportedEntries.length} entries to ${outputFile}`));
+
+      return;
+    }
+
+    // Original content type-based selection
     const contentType = getContentType(options.type);
     if (!contentType) {
       throw new Error(`Unknown content type: ${options.type}`);
     }
-
-    spinner.text = 'Connecting to Contentful...';
-    const environment = await contentfulConfig.getEnvironment();
 
     let entryId = options.id;
 

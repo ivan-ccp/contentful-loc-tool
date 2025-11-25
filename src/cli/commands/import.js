@@ -4,7 +4,7 @@ const chalk = require('chalk');
 const contentfulConfig = require('../../config/contentful');
 const { getContentType } = require('../../models/contentTypes');
 const RichTextService = require('../../services/richText');
-const { fetchEntryWithReferences } = require('../../utils/contentfulHelpers');
+const { fetchEntryWithReferences, removeTagFromEntry } = require('../../utils/contentfulHelpers');
 
 // Function to sanitize JSON content
 function sanitizeJsonContent(content) {
@@ -126,7 +126,15 @@ async function importCommand(options) {
       // Now we need to update the actual Contentful entries
       await updateContentfulEntries(environment, mergedFields, contentType);
       
-      spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id}`));
+      // Remove the "toLocalize" tag after successful import
+      spinner.text = `Removing "toLocalize" tag from entry ${translatedEntry.id}...`;
+      const tagRemoved = await removeTagFromEntry(environment, translatedEntry.id, 'toLocalize');
+      
+      if (tagRemoved) {
+        spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id} and removed "toLocalize" tag`));
+      } else {
+        spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id}`));
+      }
     }
 
     spinner.succeed(chalk.green('Import completed successfully'));
