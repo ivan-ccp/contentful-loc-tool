@@ -4,7 +4,7 @@ const chalk = require('chalk');
 const contentfulConfig = require('../../config/contentful');
 const { getContentType } = require('../../models/contentTypes');
 const RichTextService = require('../../services/richText');
-const { fetchEntryWithReferences, removeTagFromEntry } = require('../../utils/contentfulHelpers');
+const { fetchEntryWithReferences, removeTagFromEntry, SUPPORTED_LANGUAGES } = require('../../utils/contentfulHelpers');
 
 // Function to sanitize JSON content
 function sanitizeJsonContent(content) {
@@ -23,6 +23,112 @@ function sanitizeJsonContent(content) {
     .replace(/[\u2013\u2014]/g, '-')
     // Trim whitespace
     .trim();
+}
+
+/**
+ * Check if a value is non-empty
+ * @param {*} value - The value to check
+ * @returns {boolean} True if the value is non-empty, false otherwise
+ */
+function isNonEmpty(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === 'string') {
+    return value.trim() !== '';
+  }
+  return true;
+}
+
+/**
+ * Check if all supported localizations are present and non-empty in the merged fields
+ * @param {Object} mergedFields - The merged fields object
+ * @param {Object} contentType - Content type configuration
+ * @returns {boolean} True if all localizations are present and non-empty, false otherwise
+ */
+function hasAllLocalizations(mergedFields, contentType) {
+  let hasLocalizedFields = false;
+  
+  // Check all regular fields
+  for (const fieldName of contentType.fields) {
+    const fieldValue = mergedFields[fieldName];
+    
+    // Only check if the field exists and is a localized field
+    if (fieldValue && typeof fieldValue === 'object' && !Array.isArray(fieldValue) && !fieldValue.nodeType) {
+      hasLocalizedFields = true;
+      // Check if all supported languages are present and non-empty
+      for (const lang of SUPPORTED_LANGUAGES) {
+        if (!(lang in fieldValue) || !isNonEmpty(fieldValue[lang])) {
+          return false;
+        }
+      }
+    }
+  }
+  
+  // If no localized fields were found, return false (can't have all localizations if there are no fields)
+  if (!hasLocalizedFields && contentType.fields.length > 0) {
+    return false;
+  }
+  
+  // Check reference fields
+  if (contentType.references) {
+    for (const [refField, refConfig] of Object.entries(contentType.references)) {
+      if (mergedFields[refField]) {
+        const localizedRefField = mergedFields[refField];
+        
+        // Check if all locales are present for the reference field
+        for (const lang of SUPPORTED_LANGUAGES) {
+          if (!(lang in localizedRefField)) {
+            return false;
+          }
+        }
+        
+        // For each locale, check the referenced entries
+        for (const [locale, refValue] of Object.entries(localizedRefField)) {
+          if (Array.isArray(refValue)) {
+            // Check each referenced entry in the array
+            for (const ref of refValue) {
+              if (ref && typeof ref === 'object') {
+                // Check all fields in the referenced entry
+                for (const refFieldName of refConfig.fields) {
+                  if (ref[refFieldName]) {
+                    const refFieldValue = ref[refFieldName];
+                    // Check if it's a localized field
+                    if (refFieldValue && typeof refFieldValue === 'object' && !Array.isArray(refFieldValue) && !refFieldValue.nodeType) {
+                      // Check if all supported languages are present and non-empty
+                      for (const lang of SUPPORTED_LANGUAGES) {
+                        if (!(lang in refFieldValue) || !isNonEmpty(refFieldValue[lang])) {
+                          return false;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          } else if (refValue && typeof refValue === 'object' && refValue.id) {
+            // Single reference object
+            for (const refFieldName of refConfig.fields) {
+              if (refValue[refFieldName]) {
+                const refFieldValue = refValue[refFieldName];
+                // Check if it's a localized field
+                if (refFieldValue && typeof refFieldValue === 'object' && !Array.isArray(refFieldValue) && !refFieldValue.nodeType) {
+                  // Check if all supported languages are present and non-empty
+                  for (const lang of SUPPORTED_LANGUAGES) {
+                    if (!(lang in refFieldValue) || !isNonEmpty(refFieldValue[lang])) {
+                      return false;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return true;
 }
 
 async function importCommand(options) {
@@ -112,8 +218,26 @@ async function importCommand(options) {
               });
                 }
           } else {
-            // Handle other fields normally
-            merged[fieldName] = fieldValue;
+            // Handle other fields - merge localized fields instead of overwriting
+            if (fieldValue && typeof fieldValue === 'object' && !Array.isArray(fieldValue) && !fieldValue.nodeType) {
+              // It's a localized field - merge the locales
+              if (!merged[fieldName]) {
+                merged[fieldName] = {};
+              }
+              // Preserve existing locales from current entry
+              if (current[fieldName] && typeof current[fieldName] === 'object' && !Array.isArray(current[fieldName])) {
+                merged[fieldName] = { ...current[fieldName] };
+              }
+              // Merge each locale from translated into merged (only non-empty values)
+              for (const [lang, text] of Object.entries(fieldValue)) {
+                if (text && text.trim && text.trim() !== '' && text !== '') {
+                  merged[fieldName][lang] = text;
+                }
+              }
+            } else {
+              // Non-localized field - overwrite
+              merged[fieldName] = fieldValue;
+            }
           }
         }
 
@@ -123,17 +247,25 @@ async function importCommand(options) {
       // Merge the translations
       const mergedFields = mergeTranslations(currentEntry.fields, translatedEntry.fields);
       
+      // Check if all localizations are present before updating (check merged fields which represent final state)
+      const allLocalizationsPresent = hasAllLocalizations(mergedFields, contentType);
+      
       // Now we need to update the actual Contentful entries
       await updateContentfulEntries(environment, mergedFields, contentType);
       
-      // Remove the "toLocalize" tag after successful import
-      spinner.text = `Removing "toLocalize" tag from entry ${translatedEntry.id}...`;
-      const tagRemoved = await removeTagFromEntry(environment, translatedEntry.id, 'toLocalize');
-      
-      if (tagRemoved) {
-        spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id} and removed "toLocalize" tag`));
+      if (allLocalizationsPresent) {
+        // Remove the "toLocalize" tag only if all localizations are present
+        spinner.text = `Removing "toLocalize" tag from entry ${translatedEntry.id}...`;
+        const tagRemoved = await removeTagFromEntry(environment, translatedEntry.id, 'toLocalize');
+        
+        if (tagRemoved) {
+          spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id} and removed "toLocalize" tag`));
+        } else {
+          spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id}`));
+        }
       } else {
-        spinner.succeed(chalk.green(`Updated entry ${translatedEntry.id}`));
+        // Keep the tag if not all localizations are present
+        spinner.succeed(chalk.yellow(`Updated entry ${translatedEntry.id} (keeping "toLocalize" tag - not all localizations present)`));
       }
     }
 
