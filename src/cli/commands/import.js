@@ -251,7 +251,7 @@ async function importCommand(options) {
       const allLocalizationsPresent = hasAllLocalizations(mergedFields, contentType);
       
       // Now we need to update the actual Contentful entries
-      await updateContentfulEntries(environment, mergedFields, contentType);
+      await updateContentfulEntries(environment, translatedEntry.id, mergedFields, contentType);
       
       if (allLocalizationsPresent) {
         // Remove the "toLocalize" tag only if all localizations are present
@@ -278,7 +278,36 @@ async function importCommand(options) {
 }
 
 // Function to update Contentful entries with merged data
-async function updateContentfulEntries(environment, mergedFields, contentType) {
+async function updateContentfulEntries(environment, entryId, mergedFields, contentType) {
+  // Update the main entry
+  try {
+    const mainEntry = await environment.getEntry(entryId);
+    
+    // Update each field in the main entry
+    for (const fieldName of contentType.fields) {
+      if (mergedFields[fieldName]) {
+        const fieldValue = mergedFields[fieldName];
+        
+        // Check if this is a Rich Text field
+        const isRichText = contentType.richTextFields?.includes(fieldName);
+        
+        if (isRichText) {
+          // Convert markdown/plain text to Rich Text format
+          const richTextValue = await RichTextService.fromMarkdown(fieldValue, mainEntry.fields[fieldName]);
+          mainEntry.fields[fieldName] = richTextValue;
+        } else {
+          // Regular localized field - use merged value directly
+          mainEntry.fields[fieldName] = fieldValue;
+        }
+      }
+    }
+    
+    await mainEntry.update();
+  } catch (error) {
+    console.warn(`Failed to update main entry ${entryId}:`, error.message);
+    throw error;
+  }
+  
   // Handle references
   if (contentType.references) {
     for (const [refField, refConfig] of Object.entries(contentType.references)) {
