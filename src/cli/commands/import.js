@@ -279,12 +279,18 @@ async function importCommand(options) {
 
 // Function to update Contentful entries with merged data
 async function updateContentfulEntries(environment, entryId, mergedFields, contentType) {
-  // Update the main entry
+  // Get the main entry (needed for both regular fields and reference fields)
+  let mainEntry;
   try {
-    const mainEntry = await environment.getEntry(entryId);
+    mainEntry = await environment.getEntry(entryId);
     
-    // Update each field in the main entry
+    // Update each field in the main entry (skip reference fields - they're handled separately)
     for (const fieldName of contentType.fields) {
+      // Skip reference fields - they will be handled in the reference section below
+      if (contentType.references && contentType.references[fieldName]) {
+        continue;
+      }
+      
       if (mergedFields[fieldName]) {
         const fieldValue = mergedFields[fieldName];
         
@@ -301,55 +307,84 @@ async function updateContentfulEntries(environment, entryId, mergedFields, conte
         }
       }
     }
-    
-    await mainEntry.update();
   } catch (error) {
-    console.warn(`Failed to update main entry ${entryId}:`, error.message);
+    console.warn(`Failed to get or update main entry ${entryId}:`, error.message);
     throw error;
   }
   
-  // Handle references
-  if (contentType.references) {
-    for (const [refField, refConfig] of Object.entries(contentType.references)) {
-      if (mergedFields[refField]) {
-        const localizedField = mergedFields[refField];
-        
-        // Handle localized reference fields
-        for (const [locale, refValue] of Object.entries(localizedField)) {
-          if (Array.isArray(refValue)) {
-            // Handle array of references
-            for (const ref of refValue) {
-              if (ref && ref.id) {
-                try {
-                  const refEntry = await environment.getEntry(ref.id);
-                  if (refEntry.sys.contentType.sys.id === refConfig.type) {
-                    // Update the referenced entry's fields
-                    for (const [fieldName, fieldValue] of Object.entries(ref)) {
-                      if (fieldName !== 'id' && fieldValue) {
-                        // Check if this is a Rich Text field
-                        const isRichText = refEntry.fields[fieldName]?.nodeType === 'document' || 
-                                         refConfig.richTextFields?.includes(fieldName);
-                        
-                        if (isRichText) {
-                          // Convert plain text to Rich Text format
-                          const richTextValue = await RichTextService.fromMarkdown(fieldValue, refEntry.fields[fieldName]);
-                          refEntry.fields[fieldName] = richTextValue;
-                        } else {
-                          refEntry.fields[fieldName] = fieldValue;
+  // Handle references - convert {id, val} structure to Contentful Link format
+  try {
+    if (contentType.references) {
+      for (const [refField, refConfig] of Object.entries(contentType.references)) {
+        if (mergedFields[refField]) {
+          const localizedField = mergedFields[refField];
+          
+          // Initialize the reference field on main entry if it doesn't exist
+          if (!mainEntry.fields[refField]) {
+            mainEntry.fields[refField] = {};
+          }
+          
+          // Handle localized reference fields
+          for (const [locale, refValue] of Object.entries(localizedField)) {
+            if (Array.isArray(refValue)) {
+              // Convert array of {id, val} objects to array of Contentful Link objects
+              const linkArray = [];
+              
+              // Handle array of references
+              for (const ref of refValue) {
+                if (ref && ref.id) {
+                  try {
+                    const refEntry = await environment.getEntry(ref.id);
+                    if (refEntry.sys.contentType.sys.id === refConfig.type) {
+                      // Convert {id, val} to Contentful Link format
+                      linkArray.push({
+                        sys: {
+                          type: 'Link',
+                          linkType: 'Entry',
+                          id: ref.id
+                        }
+                      });
+                      
+                      // Update the referenced entry's fields
+                      for (const [fieldName, fieldValue] of Object.entries(ref)) {
+                        if (fieldName !== 'id' && fieldValue) {
+                          // Check if this is a Rich Text field
+                          const isRichText = refEntry.fields[fieldName]?.nodeType === 'document' || 
+                                           refConfig.richTextFields?.includes(fieldName);
+                          
+                          if (isRichText) {
+                            // Convert plain text to Rich Text format
+                            const richTextValue = await RichTextService.fromMarkdown(fieldValue, refEntry.fields[fieldName]);
+                            refEntry.fields[fieldName] = richTextValue;
+                          } else {
+                            refEntry.fields[fieldName] = fieldValue;
+                          }
                         }
                       }
+                      await refEntry.update();
                     }
-                    await refEntry.update();
+                  } catch (error) {
+                    console.warn(`Failed to update reference ${ref.id}:`, error.message);
                   }
-                } catch (error) {
-                  console.warn(`Failed to update reference ${ref.id}:`, error.message);
                 }
               }
+              
+              // Set the reference field on the main entry with Link format
+              mainEntry.fields[refField][locale] = linkArray;
             }
           }
         }
       }
+      
+      // Update the main entry after setting reference fields
+      await mainEntry.update();
+    } else {
+      // No references, update the main entry now
+      await mainEntry.update();
     }
+  } catch (error) {
+    console.warn(`Failed to handle references for entry ${entryId}:`, error.message);
+    throw error;
   }
 }
 
